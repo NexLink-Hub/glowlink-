@@ -1,0 +1,154 @@
+Phase 4: Error Boundaries & Error Handling — Implementation Guide
+==================================================================
+
+COMPONENTS & UTILITIES IMPLEMENTED:
+
+1. ErrorBoundary Component
+   Location: src/components/ErrorBoundary.tsx
+   Features:
+   - Catches React component render errors
+   - Displays user-friendly error UI
+   - Shows detailed stack traces in development mode
+   - Optional error callback for custom handling
+   - "Try Again" and "Go Home" buttons for recovery
+   
+   Usage:
+   <ErrorBoundary>
+     <App />
+   </ErrorBoundary>
+
+2. Error Logger Service
+   Location: src/lib/errorLogger.ts
+   Features:
+   - Centralized error logging
+   - Multiple severity levels (error, warning, info)
+   - Development vs production modes
+   - In-memory error history (last 50 errors)
+   - Ready for external service integration (Sentry, LogRocket, etc.)
+   
+   Usage:
+   import { errorLogger } from "@/lib/errorLogger";
+   errorLogger.error("Something failed", error, { context: "data" });
+   errorLogger.warning("Deprecated API", "Use v2 instead");
+   errorLogger.info("User logged in", { userId: 123 });
+
+3. Async Error Handling Utilities
+   Location: src/lib/errorHandling.ts
+   Features:
+   - safeAsync(): Wrap async operations with fallback
+   - safeSync(): Wrap sync operations with fallback
+   - withTimeout(): Add timeout to promises (30s default)
+   - retryAsync(): Retry operations with exponential backoff
+   - validateResponse(): Type-safe API response validation
+   
+   Usage:
+   const data = await safeAsync(
+     () => fetchUserData(id),
+     null,  // fallback value
+     { userId: id }
+   );
+
+   const result = await withTimeout(slowPromise, 5000);
+   const data = await retryAsync(() => fetchData(), 3, 1000);
+
+4. Error Boundary HOC
+   Location: src/components/withErrorBoundary.tsx
+   Features:
+   - Higher-order component for page-level error boundaries
+   - Wraps components with automatic error logging
+   - Ready to apply to route components
+   
+   Usage:
+   export default withErrorBoundary(Dashboard);
+
+INTEGRATION POINTS:
+
+1. App.tsx
+   - ErrorBoundary wraps entire app
+   - ErrorLogger integrated for crash tracking
+   - QueryClient retry configured (1 retry)
+
+2. Login.tsx
+   - withTimeout() protecting API calls
+   - Error logging on auth failures
+   - Better user error messages
+
+DEVELOPMENT VS PRODUCTION:
+
+Development:
+- Full error stack traces visible
+- Component stack in error boundary
+- Detailed console logging with colors
+- Local error history in memory
+
+Production:
+- User-friendly error messages
+- No sensitive error details shown
+- Errors sent to server (when configured)
+- Integration ready for Sentry, LogRocket, etc.
+
+ERROR RECOVERY STRATEGIES:
+
+1. User-Triggered Recovery:
+   - "Try Again" button resets error boundary
+   - "Go Home" redirects to safe page
+
+2. Automatic Recovery:
+   - withTimeout catches hanging requests
+   - retryAsync auto-retries failed operations
+   - safeAsync/safeSync provide fallback values
+
+3. Monitoring & Alerts:
+   - Error logs collected in memory
+   - Ready to send to external service
+   - Production errors tracked separately
+
+CONFIGURATION FOR EXTERNAL SERVICES:
+
+To integrate Sentry (example):
+1. Install: npm install @sentry/react
+2. In src/main.tsx:
+   import * as Sentry from "@sentry/react";
+   Sentry.init({ dsn: "YOUR_DSN" });
+
+3. In errorLogger.ts, uncomment Sentry calls:
+   Sentry.captureException(errorLog.error);
+
+To integrate LogRocket:
+1. Install: npm install logrocket
+2. In src/main.tsx:
+   import LogRocket from "logrocket";
+   LogRocket.init("YOUR_APP_ID");
+
+3. In errorLogger.ts:
+   fetch("/api/logs", { method: "POST", body: JSON.stringify(errorLog) });
+
+BEST PRACTICES:
+
+1. Always use errorLogger for caught errors:
+   catch (error) {
+     errorLogger.error("Operation failed", error, { context });
+   }
+
+2. Use safeAsync for important operations:
+   const user = await safeAsync(() => fetchUser(id), null);
+
+3. Add timeouts to critical API calls:
+   const response = await withTimeout(fetchData());
+
+4. Validate API responses before use:
+   if (validateResponse(data, ["id", "name"])) { ... }
+
+5. Implement retry logic for flaky endpoints:
+   const data = await retryAsync(() => fetchUnstableEndpoint());
+
+TESTING ERROR BOUNDARIES:
+
+Development: Check the browser console for error logs
+Production: Monitor your external service dashboard (Sentry, etc.)
+
+To test ErrorBoundary locally, create a component that throws:
+function ErrorTest() {
+  throw new Error("Test error");
+}
+// Then render it inside ErrorBoundary to see fallback UI
